@@ -1,10 +1,23 @@
 # Network Tools Suite AWS Terraform Infrastructure
 
-This repository contains Terraform configuration to deploy a suite of network management tools on AWS EC2 instances behind a load balancer in the London (eu-west-2) region. The suite includes:
+This repository contains Terraform configuration to deploy a comprehensive suite of network management tools on AWS EC2 instances behind a load balancer in the London (eu-west-2) region. The infrastructure provides a central landing page that gives users access to all applications through an intuitive interface.
 
-1. [Workbook Importer](https://github.com/Brownster/workbook_importer) - Import and process network workbooks
-2. [Workbook Exporter](https://github.com/Brownster/workbook_exporter) - Export network configurations to standardized workbooks
-3. [Firewall Request Generator](https://github.com/Brownster/portmapper) - Generate properly formatted firewall change requests
+## Applications Included
+
+1. **[Workbook Importer](https://github.com/Brownster/workbook_importer)**
+   - Import and process network configuration workbooks
+   - Streamline network device provisioning
+   - Generate configuration templates
+
+2. **[Workbook Exporter](https://github.com/Brownster/workbook_exporter)**
+   - Export network configurations to standardized workbooks
+   - Produce documentation for network infrastructure
+   - Create backup configurations in standardized formats
+
+3. **[Firewall Request Generator](https://github.com/Brownster/portmapper)**
+   - Generate properly formatted firewall change requests
+   - Streamline the process of requesting firewall rule changes
+   - Produce documentation for compliance and auditing
 
 ## Architecture
 
@@ -92,7 +105,7 @@ If you need to access the instance directly (restricted to your management IP):
 
 ## Troubleshooting
 
-If you encounter issues accessing the application:
+If you encounter issues accessing any of the applications:
 
 1. **Verify Instance Status**: 
    ```bash
@@ -100,22 +113,32 @@ If you encounter issues accessing the application:
    sudo cat /opt/service_check_results.log
    ```
 
-2. **Check Service Status**:
+2. **Check All Service Statuses**:
    ```bash
    sudo systemctl status nginx
-   sudo systemctl status flask_app.service
+   sudo systemctl status workbook_importer.service
+   sudo systemctl status workbook_exporter.service
+   sudo systemctl status firewall_generator.service
    ```
 
 3. **View Error Logs**:
    ```bash
-   sudo cat /var/log/nginx/flask_error.log
-   sudo journalctl -u flask_app.service
+   # Nginx logs
+   sudo cat /var/log/nginx/error.log
+   sudo cat /var/log/nginx/apps_error.log
+   
+   # Application logs
+   sudo journalctl -u workbook_importer.service
+   sudo journalctl -u workbook_exporter.service
+   sudo journalctl -u firewall_generator.service
    ```
 
-4. **Run Diagnostic Script**:
+4. **Run Comprehensive Diagnostic Script**:
    ```bash
    sudo /opt/check_services.sh
    ```
+
+For detailed troubleshooting steps, see [docs/troubleshooting.md](docs/troubleshooting.md).
 
 ## Customization
 
@@ -168,12 +191,34 @@ listener {
 
 ## Maintenance
 
-### Updating the Application
+### Updating the Applications
 
-To update the Workbook Importer application:
+To update any of the applications:
 
-1. Update the repository URL in `user_data.sh` if needed
-2. Run `terraform apply` to deploy the changes
+1. Modify the relevant repository URLs in `user_data.sh`:
+   ```bash
+   # For Workbook Importer
+   git clone https://github.com/Brownster/workbook_importer.git /opt/workbook_importer
+   
+   # For Workbook Exporter
+   git clone https://github.com/Brownster/workbook_exporter.git /opt/workbook_exporter
+   
+   # For Firewall Request Generator
+   git clone https://github.com/Brownster/portmapper.git /opt/firewall_generator
+   ```
+   
+2. You can specify branch or commit by adding the appropriate git options:
+   ```bash
+   git clone -b develop https://github.com/Brownster/workbook_importer.git /opt/workbook_importer
+   ```
+   
+3. Run `terraform apply` to deploy the changes
+
+To update the infrastructure itself:
+
+1. Modify the Terraform configuration files as needed
+2. Run `terraform plan` to review changes
+3. Run `terraform apply` to apply the changes
 
 ### Scaling
 
