@@ -1,1 +1,1 @@
-# Terraform related\n.terraform/\n*.tfstate\n*.tfstate.backup
+# Terraform related files\n.terraform/\n*.tfstate\n*.tfstate.backup\n.terraform.lock.hcl\n.terraform.tfstate.lock.info

@@ -44,6 +44,11 @@ resource "aws_instance" "web" {
   
   # Add an SSH key if you have one (optional)
   # key_name                   = "your-key-name"
+
+  # Increase the timeout for user data script execution
+  timeouts {
+    create = "20m"
+  }
   
   tags = { 
     Name = "${var.app_name}-server-${count.index + 1}" 

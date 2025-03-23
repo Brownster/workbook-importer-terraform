@@ -12,13 +12,13 @@ resource "aws_elb" "web" {
     lb_protocol       = "http"
   }
 
-  # Health check configuration for the Flask application
+  # Health check configuration - use root path for basic health check first
   health_check {
     healthy_threshold   = 2
     unhealthy_threshold = 3
-    timeout             = 5
-    target              = "HTTP:80/"  # Checking Nginx proxy
-    interval            = 15
+    timeout             = 10
+    target              = "HTTP:80/"  # Checking Nginx's root path which serves a static file
+    interval            = 30
   }
   
   # Cross-zone load balancing distributes traffic evenly across all instances
