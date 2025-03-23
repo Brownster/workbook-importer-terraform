@@ -30,8 +30,8 @@ resource "aws_instance" "web" {
   # lookup returns a map value for a given key
   ami                    = lookup(var.ami_ids, "eu-west-2")
   instance_type          = var.instance_type
-  # Use the subnet ids as an array and evenly distribute instances
-  subnet_id              = element(aws_subnet.web_subnet.*.id, count.index % length(aws_subnet.web_subnet.*.id))
+  # Use the public subnet ids for instances to ensure they get public IPs
+  subnet_id              = element(aws_subnet.public_subnet.*.id, count.index % length(aws_subnet.public_subnet.*.id))
   
   # Use instance user_data to install and configure the Flask app
   user_data              = file("user_data.sh")
@@ -41,6 +41,9 @@ resource "aws_instance" "web" {
   
   # Make sure the instance can reach the internet
   associate_public_ip_address = true
+  
+  # Add an SSH key if you have one (optional)
+  # key_name                   = "your-key-name"
   
   tags = { 
     Name = "${var.app_name}-server-${count.index + 1}" 
@@ -55,4 +58,10 @@ resource "aws_instance" "web" {
       Name = "${var.app_name}-volume-${count.index + 1}"
     }
   }
+
+  # Make sure the VPC and subnets are ready before launching instances
+  depends_on = [
+    aws_subnet.public_subnet,
+    aws_route_table_association.public_subnet_rta
+  ]
 }

@@ -16,12 +16,12 @@ variable "instance_count" {
   default     = 2
 }
 
-# AMI IDs for the instances
+# AMI IDs for the instances - use the latest Amazon Linux 2 AMIs
 variable "ami_ids" {
   description = "AMI IDs for different regions"
   default = {
-    # Amazon Linux 2 AMIs - updated for workbook importer deployment
-    "eu-west-2" = "ami-0b1b3bfbd4ad9aad3"  # Amazon Linux 2 AMI in eu-west-2 (London)
+    # Amazon Linux 2 AMIs - updated March 2023
+    "eu-west-2" = "ami-04706e771f950937f"  # Amazon Linux 2 AMI in eu-west-2 (London)
     "us-west-2" = "ami-0c2d06d50ce30b442"  # Amazon Linux 2 AMI in us-west-2
     "us-east-1" = "ami-0cff7528ff583bf9a"  # Amazon Linux 2 AMI in us-east-1
   }
