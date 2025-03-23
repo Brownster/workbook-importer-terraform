@@ -57,10 +57,6 @@ http {
 }
 EOF
 
-# Create directory for application
-echo "Creating application directory"
-mkdir -p /opt/workbook_importer
-
 # Create webroot directory for Nginx
 mkdir -p /usr/share/nginx/html
 
@@ -74,13 +70,17 @@ cat > /usr/share/nginx/html/index.html <<'EOF'
 <body>
     <h1>Workbook Importer Application is Running</h1>
     <p>This is a health check page for the load balancer.</p>
-    <p>To access the Flask application, go to <a href="/app">/app</a>.</p>
+    <p>To access the Workbook Importer application, go to <a href="/app">/app</a>.</p>
 </body>
 </html>
 EOF
 
+# Create directory for application
+echo "Creating application directory"
+mkdir -p /opt/workbook_importer
+
 # Clone the repository
-echo "Cloning the repository"
+echo "Cloning the Workbook Importer repository"
 git clone https://github.com/Brownster/workbook_importer.git /opt/workbook_importer
 
 # Change to app directory for setup
@@ -90,27 +90,55 @@ cd /opt/workbook_importer
 echo "Checking repository contents:"
 ls -la
 
-# Install Python dependencies
-echo "Installing Python dependencies"
-pip3 install -r requirements.txt
+# Add a health check endpoint to the Flask app
+echo "Adding health check to the Flask app"
+cat > /opt/workbook_importer/health_check.py <<'EOF'
+from flask import Blueprint
 
-# Create a simple Flask test app just to verify connectivity
-cat > /opt/workbook_importer/test_app.py <<'EOF'
-from flask import Flask
+health_bp = Blueprint('health', __name__)
+
+@health_bp.route('/health')
+def health_check():
+    return 'OK', 200
+EOF
+
+# Modify the app.py file to add the health check endpoint
+if [ -f /opt/workbook_importer/app.py ]; then
+    # Create a backup of the original app.py
+    cp /opt/workbook_importer/app.py /opt/workbook_importer/app.py.bak
+    
+    # Ensure the app has the health check
+    if ! grep -q "health_bp" /opt/workbook_importer/app.py; then
+        echo "Modifying app.py to include health check"
+        # Add the health check to app.py by inserting it near the top imports
+        sed -i '1s/^/from health_check import health_bp\n/' /opt/workbook_importer/app.py
+        
+        # Add the blueprint registration after app = Flask(__name__)
+        if grep -q "app = Flask" /opt/workbook_importer/app.py; then
+            sed -i '/app = Flask/a app.register_blueprint(health_bp)' /opt/workbook_importer/app.py
+        fi
+    fi
+else
+    echo "WARNING: app.py not found - creating a placeholder"
+    cat > /opt/workbook_importer/app.py <<'EOF'
+from flask import Flask, render_template, request, redirect, url_for
+from health_check import health_bp
 
 app = Flask(__name__)
+app.register_blueprint(health_bp)
 
 @app.route('/')
-def hello():
-    return '<h1>Flask Test App is Working!</h1><p>This confirms the server can run Flask applications.</p>'
-
-@app.route('/health')
-def health():
-    return 'OK', 200
+def index():
+    return '<h1>Workbook Importer</h1><p>Welcome to the Workbook Importer application.</p>'
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5001)
 EOF
+fi
+
+# Install Python dependencies
+echo "Installing Python dependencies"
+pip3 install -r requirements.txt
 
 # Configure Nginx as a reverse proxy with a clean configuration
 cat > /etc/nginx/conf.d/flask_app.conf <<'EOF'
@@ -139,20 +167,23 @@ server {
         proxy_set_header X-Forwarded-Proto $scheme;
     }
 
-    # Alternative route direct to app root
-    location = /test {
-        proxy_pass http://127.0.0.1:5001/;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
-        proxy_set_header X-Forwarded-Proto $scheme;
-    }
-
     # Health check endpoint for load balancer
     location = /health {
         proxy_pass http://127.0.0.1:5001/health;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
+    }
+    
+    # Serve static files directly if they exist
+    location /static {
+        alias /opt/workbook_importer/static;
+    }
+
+    # Information pages
+    location /info.html {
+    }
+    
+    location /connectivity.html {
     }
 }
 EOF
@@ -166,21 +197,22 @@ echo "Starting Nginx"
 systemctl start nginx
 systemctl enable nginx
 
-# Create a systemd service for the test Flask app
+# Create a systemd service for the Workbook Importer Flask app
 cat > /etc/systemd/system/flask_app.service <<'EOF'
 [Unit]
-Description=Test Flask App
+Description=Workbook Importer Flask App
 After=network.target
 
 [Service]
 User=ec2-user
 WorkingDirectory=/opt/workbook_importer
-ExecStart=/usr/bin/python3 test_app.py
+ExecStart=/usr/bin/python3 app.py
 Restart=always
 RestartSec=5
 StandardOutput=journal
 StandardError=journal
-Environment=FLASK_APP=test_app.py
+Environment=FLASK_APP=app.py
+Environment=FLASK_ENV=production
 
 [Install]
 WantedBy=multi-user.target
