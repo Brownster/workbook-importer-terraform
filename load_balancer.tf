@@ -24,13 +24,13 @@ resource "aws_elb" "web" {
     }
   }
 
-  # Health check configuration - use root path for basic health check
+  # Health check configuration - use TCP check which is more reliable
   health_check {
     healthy_threshold   = 2
     unhealthy_threshold = 3
-    timeout             = 10
-    target              = "HTTP:80/index.html"  # Root index file
-    interval            = 30
+    timeout             = 5
+    target              = "TCP:80"  # Simply check if the port is open
+    interval            = 15
   }
   
   # Cross-zone load balancing distributes traffic evenly across all instances
