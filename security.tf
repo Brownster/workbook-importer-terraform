@@ -30,7 +30,25 @@ resource "aws_security_group" "web_sg" {
   description = "Allow HTTP traffic from ELB and SSH for management"
   vpc_id      = aws_vpc.web_vpc.id
   
-  # HTTP access from the ELB
+  # HTTP access from anywhere (for testing)
+  ingress {
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+    description = "Allow HTTP traffic from anywhere for testing"
+  }
+  
+  # HTTP access for the Flask app directly (for testing)
+  ingress {
+    from_port   = 5001
+    to_port     = 5001
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+    description = "Allow Flask app traffic (port 5001) from anywhere for testing"
+  }
+  
+  # HTTP access from the ELB (keep this too)
   ingress {
     from_port       = 80
     to_port         = 80
@@ -39,7 +57,7 @@ resource "aws_security_group" "web_sg" {
     description     = "Allow HTTP traffic from the load balancer"
   }
   
-  # HTTP access for the Flask app directly (useful for troubleshooting)
+  # HTTP access for Flask from ELB (keep this too)
   ingress {
     from_port       = 5001
     to_port         = 5001
@@ -48,7 +66,7 @@ resource "aws_security_group" "web_sg" {
     description     = "Allow Flask app traffic (port 5001) from the load balancer"
   }
   
-  # SSH access for management (optional, can be restricted to your IP)
+  # SSH access for management
   ingress {
     from_port   = 22
     to_port     = 22
