@@ -1,0 +1,63 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg width="800" height="600" xmlns="http://www.w3.org/2000/svg">
+  <!-- VPC -->
+  <rect x="100" y="100" width="600" height="400" fill="none" stroke="#232F3E" stroke-width="2" rx="10" ry="10"/>
+  <text x="130" y="130" font-family="Arial" font-size="16" fill="#232F3E">VPC (192.168.100.0/24)</text>
+  
+  <!-- Public Subnets -->
+  <rect x="150" y="160" width="220" height="120" fill="#F7F7F7" stroke="#232F3E" stroke-width="2" rx="5" ry="5"/>
+  <text x="170" y="180" font-family="Arial" font-size="14" fill="#232F3E">Public Subnet 1</text>
+  <text x="170" y="200" font-family="Arial" font-size="12" fill="#666666">192.168.100.128/26</text>
+  <text x="170" y="220" font-family="Arial" font-size="12" fill="#666666">eu-west-2a</text>
+  
+  <rect x="430" y="160" width="220" height="120" fill="#F7F7F7" stroke="#232F3E" stroke-width="2" rx="5" ry="5"/>
+  <text x="450" y="180" font-family="Arial" font-size="14" fill="#232F3E">Public Subnet 2</text>
+  <text x="450" y="200" font-family="Arial" font-size="12" fill="#666666">192.168.100.192/26</text>
+  <text x="450" y="220" font-family="Arial" font-size="12" fill="#666666">eu-west-2b</text>
+  
+  <!-- Private Subnets -->
+  <rect x="150" y="320" width="220" height="120" fill="#E8E8E8" stroke="#232F3E" stroke-width="2" rx="5" ry="5"/>
+  <text x="170" y="340" font-family="Arial" font-size="14" fill="#232F3E">Private Subnet 1</text>
+  <text x="170" y="360" font-family="Arial" font-size="12" fill="#666666">192.168.100.0/26</text>
+  <text x="170" y="380" font-family="Arial" font-size="12" fill="#666666">eu-west-2a</text>
+  
+  <rect x="430" y="320" width="220" height="120" fill="#E8E8E8" stroke="#232F3E" stroke-width="2" rx="5" ry="5"/>
+  <text x="450" y="340" font-family="Arial" font-size="14" fill="#232F3E">Private Subnet 2</text>
+  <text x="450" y="360" font-family="Arial" font-size="12" fill="#666666">192.168.100.64/26</text>
+  <text x="450" y="380" font-family="Arial" font-size="12" fill="#666666">eu-west-2b</text>
+  
+  <!-- EC2 Instances -->
+  <rect x="180" y="370" width="150" height="60" fill="#FFFFFF" stroke="#232F3E" stroke-width="2" rx="5" ry="5"/>
+  <text x="210" y="395" font-family="Arial" font-size="12" fill="#232F3E">EC2 Instance 1</text>
+  <text x="210" y="415" font-family="Arial" font-size="10" fill="#666666">Flask + Nginx</text>
+  
+  <rect x="460" y="370" width="150" height="60" fill="#FFFFFF" stroke="#232F3E" stroke-width="2" rx="5" ry="5"/>
+  <text x="490" y="395" font-family="Arial" font-size="12" fill="#232F3E">EC2 Instance 2</text>
+  <text x="490" y="415" font-family="Arial" font-size="10" fill="#666666">Flask + Nginx</text>
+  
+  <!-- Load Balancer -->
+  <rect x="320" y="220" width="160" height="40" fill="#FF9900" stroke="#232F3E" stroke-width="2" rx="10" ry="10"/>
+  <text x="350" y="245" font-family="Arial" font-size="14" fill="#FFFFFF">Elastic Load Balancer</text>
+  
+  <!-- Internet Gateway -->
+  <rect x="350" y="50" width="100" height="40" fill="#FF9900" stroke="#232F3E" stroke-width="2" rx="5" ry="5"/>
+  <text x="360" y="75" font-family="Arial" font-size="12" fill="#FFFFFF">Internet Gateway</text>
+  
+  <!-- Internet -->
+  <ellipse cx="400" cy="10" rx="60" ry="20" fill="#7AA5D2" stroke="#232F3E" stroke-width="2"/>
+  <text x="375" y="15" font-family="Arial" font-size="14" fill="#FFFFFF">Internet</text>
+  
+  <!-- Connections -->
+  <line x1="400" y1="30" x2="400" y2="50" stroke="#232F3E" stroke-width="2"/>
+  <line x1="400" y1="90" x2="400" y2="100" stroke="#232F3E" stroke-width="2"/>
+  
+  <line x1="400" y1="220" x2="400" y2="260" stroke="#232F3E" stroke-width="2"/>
+  <line x1="320" y1="240" x2="255" y2="370" stroke="#232F3E" stroke-width="2"/>
+  <line x1="480" y1="240" x2="535" y2="370" stroke="#232F3E" stroke-width="2"/>
+  
+  <!-- Clients -->
+  <ellipse cx="400" cy="520" rx="60" ry="20" fill="#7AA5D2" stroke="#232F3E" stroke-width="2"/>
+  <text x="380" y="525" font-family="Arial" font-size="14" fill="#FFFFFF">Users</text>
+  
+  <line x1="400" y1="500" x2="400" y2="260" stroke="#232F3E" stroke-width="2"/>
+</svg>
