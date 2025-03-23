@@ -66,14 +66,14 @@ resource "aws_security_group" "web_sg" {
     description     = "Allow Flask app traffic (port 5001) from the load balancer"
   }
   
-  # SSH access for management
-  ingress {
-    from_port   = 22
-    to_port     = 22
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]  # Consider restricting to your IP: ["your-ip/32"]
-    description = "Allow SSH access for management"
-  }
+#  # SSH access for management
+#  ingress {
+#    from_port   = 22
+#    to_port     = 22
+#    protocol    = "tcp"
+#    cidr_blocks = ["0.0.0.0/0"]  # Consider restricting to your IP: ["your-ip/32"]
+#    description = "Allow SSH access for management"
+#  }
   
   # Allow all outbound traffic
   egress {
