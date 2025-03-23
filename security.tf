@@ -1,6 +1,6 @@
 resource "aws_security_group" "elb_sg" {
-  name        = "${var.app_name}-elb-sg"
-  description = "Allow incoming HTTP traffic from the internet"
+  name        = "${var.app_name}-alb-sg"
+  description = "Allow incoming HTTP/HTTPS traffic from the internet"
   vpc_id      = aws_vpc.web_vpc.id
   
   # Allow HTTP from anywhere to the load balancer
@@ -34,7 +34,7 @@ resource "aws_security_group" "elb_sg" {
   }
   
   tags = {
-    Name = "${var.app_name}-elb-sg"
+    Name = "${var.app_name}-alb-sg"
   }
 }
 
@@ -44,13 +44,22 @@ resource "aws_security_group" "web_sg" {
   description = "Restricted access security group for web servers"
   vpc_id      = aws_vpc.web_vpc.id
   
-  # SSH access only from your management IP
+  # SSH access from your management IP
   ingress {
     from_port   = 22
     to_port     = 22
     protocol    = "tcp"
     cidr_blocks = ["${var.management_ip}/32"]  
-    description = "Allow SSH access from management IP only"
+    description = "Allow SSH access from management IP"
+  }
+  
+  # SSH access from AWS EC2 Instance Connect
+  ingress {
+    from_port   = 22
+    to_port     = 22
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]  
+    description = "Allow SSH access from AWS EC2 Instance Connect"
   }
   
   # Restrict outbound access to necessary services
@@ -107,14 +116,14 @@ resource "aws_security_group" "web_sg" {
 }
 
 # Add HTTP ingress rule for web servers from the load balancer
-resource "aws_security_group_rule" "web_http_from_elb" {
+resource "aws_security_group_rule" "web_http_from_alb" {
   security_group_id        = aws_security_group.web_sg.id
   type                     = "ingress"
   from_port                = 80
   to_port                  = 80
   protocol                 = "tcp"
   source_security_group_id = aws_security_group.elb_sg.id
-  description              = "Allow HTTP traffic from the load balancer"
+  description              = "Allow HTTP traffic from the Application Load Balancer"
 }
 
 # Flask is only accessed internally by Nginx, no need to open it to the ELB

@@ -9,13 +9,13 @@ output "public_ips" {
 }
 
 output "load_balancer_dns" {
-  description = "DNS name of the load balancer for the Workbook Importer application"
-  value       = aws_elb.web.dns_name
+  description = "DNS name of the load balancer for the Network Tools Suite"
+  value       = aws_lb.web.dns_name
 }
 
 output "application_url" {
-  description = "URL to access the Workbook Importer application"
-  value       = "http://${aws_elb.web.dns_name}"
+  description = "URL to access the Network Tools Suite"
+  value       = "http://${aws_lb.web.dns_name}"
 }
 
 output "instance_ids" {
