@@ -44,3 +44,16 @@ variable "management_ip" {
   description = "IP address allowed to SSH to instances (use your own IP)"
   default     = "0.0.0.0"  # Change this to your IP address before deploying
 }
+
+# Domain name for HTTPS setup
+variable "domain_name" {
+  description = "Domain name for the application (required for HTTPS)"
+  default     = ""  # e.g., "example.com" or "app.example.com"
+}
+
+# Enable HTTPS
+variable "enable_https" {
+  description = "Whether to enable HTTPS using ACM"
+  type        = bool
+  default     = false
+}

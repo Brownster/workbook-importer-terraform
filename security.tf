@@ -12,6 +12,18 @@ resource "aws_security_group" "elb_sg" {
     description = "Allow HTTP traffic from anywhere"
   }
   
+  # Allow HTTPS (443) when enabled
+  dynamic "ingress" {
+    for_each = var.enable_https ? [1] : []
+    content {
+      from_port   = 443
+      to_port     = 443
+      protocol    = "tcp"
+      cidr_blocks = ["0.0.0.0/0"]
+      description = "Allow HTTPS traffic from anywhere"
+    }
+  }
+  
   # Only allow outbound traffic to the web instances on port 80
   egress {
     from_port       = 80

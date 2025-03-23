@@ -4,7 +4,7 @@ resource "aws_elb" "web" {
   security_groups = [aws_security_group.elb_sg.id]
   instances       = aws_instance.web.*.id
 
-  # Listen for HTTP requests and distribute them to the instances
+  # HTTP listener - always exists
   listener { 
     instance_port     = 80
     instance_protocol = "http"
@@ -12,7 +12,19 @@ resource "aws_elb" "web" {
     lb_protocol       = "http"
   }
 
-  # Health check configuration - initially use a static page for health checks
+  # HTTPS listener - only when enabled and certificate exists
+  dynamic "listener" {
+    for_each = var.enable_https && var.domain_name != "" ? [1] : []
+    content {
+      instance_port      = 80
+      instance_protocol  = "http"
+      lb_port            = 443
+      lb_protocol        = "https"
+      ssl_certificate_id = aws_acm_certificate_validation.cert_validation[0].certificate_arn
+    }
+  }
+
+  # Health check configuration - use root path for basic health check
   health_check {
     healthy_threshold   = 2
     unhealthy_threshold = 3
