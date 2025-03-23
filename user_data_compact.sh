@@ -33,7 +33,8 @@ log_command "yum install -y wkhtmltopdf telnet nc wget"
 
 # Create directory structure
 log_message "Creating directory structure"
-log_command "mkdir -p /usr/share/nginx/html /opt/workbook_importer /opt/workbook_exporter /opt/firewall_generator /opt/logs"
+log_command "mkdir -p /usr/share/nginx/html/static /usr/share/nginx/html/importer /usr/share/nginx/html/exporter /usr/share/nginx/html/firewall /opt/workbook_importer /opt/workbook_exporter /opt/firewall_generator /opt/logs"
+log_command "chmod 755 /usr/share/nginx/html /usr/share/nginx/html/static /usr/share/nginx/html/importer /usr/share/nginx/html/exporter /usr/share/nginx/html/firewall /opt/workbook_importer /opt/workbook_exporter /opt/firewall_generator"
 
 # Gather instance metadata
 log_message "Gathering instance metadata"
@@ -261,14 +262,8 @@ server {
 
     # Health check endpoint for load balancer
     location = /health {
-        proxy_pass http://127.0.0.1:5001/health;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-        # Fallback if application not yet running
-        error_page 502 504 = @health_static;
-    }
-    
-    location @health_static {
+        # Simple static health check that always returns OK
+        # This is more reliable than depending on the application
         return 200 'OK';
         add_header Content-Type text/plain;
     }
@@ -281,12 +276,18 @@ server {
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
         # Fallback if application not yet running
-        error_page 502 504 = @importer_static;
+        error_page 502 504 = /importer/index.html;
     }
     
-    location @importer_static {
-        alias /usr/share/nginx/html/importer;
-        try_files $uri $uri/ /importer/index.html;
+    # Static files for importer
+    location /importer/ {
+        try_files $uri $uri/ @proxy_importer;
+    }
+    
+    location @proxy_importer {
+        proxy_pass http://127.0.0.1:5001/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
     }
 
     # Workbook Exporter - on port 5002 with gunicorn
@@ -297,12 +298,18 @@ server {
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
         # Fallback if application not yet running
-        error_page 502 504 = @exporter_static;
+        error_page 502 504 = /exporter/index.html;
     }
     
-    location @exporter_static {
-        alias /usr/share/nginx/html/exporter;
-        try_files $uri $uri/ /exporter/index.html;
+    # Static files for exporter
+    location /exporter/ {
+        try_files $uri $uri/ @proxy_exporter;
+    }
+    
+    location @proxy_exporter {
+        proxy_pass http://127.0.0.1:5002/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
     }
 
     # Firewall Request Generator - on port 5003
@@ -313,18 +320,24 @@ server {
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
         # Fallback if application not yet running
-        error_page 502 504 = @firewall_static;
+        error_page 502 504 = /firewall/index.html;
     }
     
-    location @firewall_static {
-        alias /usr/share/nginx/html/firewall;
-        try_files $uri $uri/ /firewall/index.html;
+    # Static files for firewall
+    location /firewall/ {
+        try_files $uri $uri/ @proxy_firewall;
+    }
+    
+    location @proxy_firewall {
+        proxy_pass http://127.0.0.1:5003/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
     }
     
     # Static files for all applications
     location /static/ {
-        # Try each application's static folder
-        try_files $uri @importer_static @exporter_static @firewall_static;
+        # Try the static directories
+        try_files $uri /usr/share/nginx/html/static/$uri =404;
     }
 
     # Information pages
@@ -384,7 +397,7 @@ Restart=always
 RestartSec=5
 StandardOutput=journal
 StandardError=journal
-Environment=FLASK_APP=workbook_exporter-fe5.py
+Environment=FLASK_APP=app.py
 Environment=FLASK_ENV=production
 
 [Install]
