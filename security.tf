@@ -3,6 +3,7 @@ resource "aws_security_group" "elb_sg" {
   description = "Allow incoming HTTP traffic from the internet"
   vpc_id      = aws_vpc.web_vpc.id
   
+  # Allow HTTP from anywhere to the load balancer
   ingress {
     from_port   = 80
     to_port     = 80
@@ -11,13 +12,13 @@ resource "aws_security_group" "elb_sg" {
     description = "Allow HTTP traffic from anywhere"
   }
   
-  # Allow all outbound traffic
+  # Only allow outbound traffic to the web instances on port 80
   egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
-    cidr_blocks = ["0.0.0.0/0"]
-    description = "Allow all outbound traffic"
+    from_port       = 80
+    to_port         = 80
+    protocol        = "tcp"
+    security_groups = [aws_security_group.web_sg.id]
+    description     = "Allow HTTP traffic to web instances"
   }
   
   tags = {
@@ -27,61 +28,73 @@ resource "aws_security_group" "elb_sg" {
 
 resource "aws_security_group" "web_sg" {
   name        = "${var.app_name}-web-sg"
-  description = "Allow HTTP traffic from ELB and SSH for management"
+  description = "Restricted access security group for web servers"
   vpc_id      = aws_vpc.web_vpc.id
   
-  # HTTP access from anywhere (for testing)
-  ingress {
-    from_port   = 80
-    to_port     = 80
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-    description = "Allow HTTP traffic from anywhere for testing"
-  }
-  
-  # HTTP access for the Flask app directly (for testing)
-  ingress {
-    from_port   = 5001
-    to_port     = 5001
-    protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]
-    description = "Allow Flask app traffic (port 5001) from anywhere for testing"
-  }
-  
-  # HTTP access from the ELB (keep this too)
+  # HTTP access from load balancer only
   ingress {
     from_port       = 80
     to_port         = 80
     protocol        = "tcp"
     security_groups = [aws_security_group.elb_sg.id]
-    description     = "Allow HTTP traffic from the load balancer"
+    description     = "Allow HTTP traffic from the load balancer only"
   }
   
-  # HTTP access for Flask from ELB (keep this too)
-  ingress {
-    from_port       = 5001
-    to_port         = 5001
-    protocol        = "tcp"
-    security_groups = [aws_security_group.elb_sg.id]
-    description     = "Allow Flask app traffic (port 5001) from the load balancer"
-  }
-  
-  # SSH access for management
+  # SSH access only from your management IP (change this to your IP)
   ingress {
     from_port   = 22
     to_port     = 22
     protocol    = "tcp"
-    cidr_blocks = ["0.0.0.0/0"]  # Consider restricting to your IP: ["your-ip/32"]
-    description = "Allow SSH access for management"
+    cidr_blocks = ["${var.management_ip}/32"]  
+    description = "Allow SSH access from management IP only"
   }
   
-  # Allow all outbound traffic
+  # Restrict outbound access to necessary services
+  
+  # Allow HTTPS to GitHub (for git clone and pulls)
   egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    # GitHub IP ranges - these can change, so we'll use a wider range for reliability
+    cidr_blocks = ["140.82.112.0/20", "192.30.252.0/22", "185.199.108.0/22"]
+    description = "Allow HTTPS to GitHub"
+  }
+  
+  # Allow HTTP for package repositories and updates
+  egress {
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
     cidr_blocks = ["0.0.0.0/0"]
-    description = "Allow all outbound traffic"
+    description = "Allow HTTP for package repositories"
+  }
+  
+  # Allow HTTPS for package repositories and Python pip
+  egress {
+    from_port   = 443
+    to_port     = 443
+    protocol    = "tcp"
+    cidr_blocks = ["0.0.0.0/0"]
+    description = "Allow HTTPS for package repositories and PyPI"
+  }
+  
+  # Allow DNS for domain name resolution
+  egress {
+    from_port   = 53
+    to_port     = 53
+    protocol    = "udp"
+    cidr_blocks = ["0.0.0.0/0"]
+    description = "Allow DNS queries"
+  }
+  
+  # Allow NTP for time synchronization
+  egress {
+    from_port   = 123
+    to_port     = 123
+    protocol    = "udp"
+    cidr_blocks = ["0.0.0.0/0"]
+    description = "Allow NTP for time synchronization"
   }
   
   tags = {

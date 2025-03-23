@@ -38,3 +38,9 @@ variable "app_name" {
   description = "Name of the application"
   default     = "workbook-importer"
 }
+
+# Management IP address for SSH access
+variable "management_ip" {
+  description = "IP address allowed to SSH to instances (use your own IP)"
+  default     = "0.0.0.0"  # Change this to your IP address before deploying
+}

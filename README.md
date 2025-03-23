@@ -30,6 +30,7 @@ Upon deployment, the infrastructure automatically:
 - [Terraform](https://www.terraform.io/downloads.html) 0.12+
 - AWS credentials configured with appropriate permissions
 - Git (for cloning this repository)
+- Your IP address for management access
 
 ## Deployment Instructions
 
@@ -39,33 +40,43 @@ Upon deployment, the infrastructure automatically:
    cd workbook-importer-terraform
    ```
 
-2. Initialize Terraform:
+2. Set your management IP in variables.tf:
+   ```bash
+   # Edit the management_ip variable with your IP address
+   # Example: default = "203.0.113.1"
+   ```
+
+3. Initialize Terraform:
    ```bash
    terraform init
    ```
 
-3. Review the execution plan:
+4. Review the execution plan:
    ```bash
    terraform plan
    ```
 
-4. Apply the configuration:
+5. Apply the configuration:
    ```bash
    terraform apply
    ```
 
-5. After successful deployment (which may take 5-10 minutes), the following outputs will be displayed:
+6. After successful deployment (which may take 5-10 minutes), the following outputs will be displayed:
    - `application_url`: URL to access the application
    - `load_balancer_dns`: DNS name of the load balancer
    - `public_ips`: Public IP addresses of the EC2 instances
 
 ## Accessing the Application
 
-You can access the application through multiple endpoints:
+You can access the application through the load balancer:
 
-- **Load Balancer URL**: http://[load_balancer_dns]/ (Main access point)
-- **Instance Direct Access**: http://[instance_public_ip]/app (For testing)
-- **Instance Info**: http://[instance_public_ip]/info.html (Instance details)
+- **Main landing page**: http://[load_balancer_dns]/
+- **Workbook Importer App**: http://[load_balancer_dns]/app
+- **Health check endpoint**: http://[load_balancer_dns]/health
+
+If you need to access the instance directly (restricted to your management IP):
+
+- **SSH access**: `ssh ec2-user@[instance_public_ip]`
 
 ## Troubleshooting
 
@@ -105,6 +116,7 @@ The main configuration variables are defined in `variables.tf`. You can customiz
 - `app_name`: Application name (default: workbook-importer)
 - `network_cidr`: VPC CIDR block (default: 192.168.100.0/24)
 - `availability_zones`: AZs to deploy into (default: eu-west-2a, eu-west-2b)
+- `management_ip`: Your IP address for SSH access (REQUIRED)
 
 ### Adding SSL/TLS
 
@@ -128,8 +140,13 @@ listener {
 
 ## Security Considerations
 
-- **SSH Access**: Limit SSH access to specific IP addresses by modifying the ingress rules in `security.tf`
-- **HTTPS**: Enable HTTPS for production deployments using AWS Certificate Manager
+- **SSH Access**: SSH access is limited to your management IP address. Set your IP in the `management_ip` variable before deploying.
+- **Restricted Traffic**: Only necessary outbound traffic is allowed:
+  - HTTPS to GitHub repositories
+  - HTTP/HTTPS for package repositories
+  - DNS and NTP for essential services
+- **Internal Flask Application**: The Flask app is only accessible through the load balancer, not directly
+- **HTTPS**: For production, enable HTTPS using AWS Certificate Manager
 - **Instance Profile**: Consider using IAM roles instead of hardcoded credentials
 - **Network Segmentation**: Further isolate components using network ACLs
 
