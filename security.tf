@@ -24,14 +24,13 @@ resource "aws_security_group" "elb_sg" {
     }
   }
   
-  # Restrict outbound traffic to only what's needed
-  # HTTP to instances (for health checks and forwarding requests)
+  # Allow all outbound traffic for the load balancer
   egress {
-    from_port   = 80
-    to_port     = 80
-    protocol    = "tcp"
-    cidr_blocks = [var.network_cidr]
-    description = "Allow HTTP traffic to web instances"
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = ["0.0.0.0/0"]
+    description = "Allow all outbound traffic from the load balancer"
   }
   
   tags = {

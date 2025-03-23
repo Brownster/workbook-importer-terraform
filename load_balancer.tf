@@ -29,7 +29,7 @@ resource "aws_elb" "web" {
     healthy_threshold   = 2
     unhealthy_threshold = 3
     timeout             = 10
-    target              = "HTTP:80/"  # Root path static HTML file
+    target              = "HTTP:80/index.html"  # Root index file
     interval            = 30
   }
   
