@@ -9,16 +9,62 @@ yum update -y
 yum install -y python3 python3-pip git
 
 # Install nginx from Amazon Linux extras
+echo "Installing Nginx"
 amazon-linux-extras install -y nginx1
-systemctl start nginx
-systemctl enable nginx
+
+# Install troubleshooting tools
+yum install -y telnet nc
+
+# Stop Nginx to make configuration changes
+systemctl stop nginx
+
+# IMPORTANT: Remove default configuration files that might conflict
+echo "Removing default Nginx configurations"
+rm -f /etc/nginx/conf.d/default.conf
+mv /etc/nginx/nginx.conf /etc/nginx/nginx.conf.bak
+
+# Create a clean main nginx.conf
+cat > /etc/nginx/nginx.conf <<'EOF'
+user nginx;
+worker_processes auto;
+error_log /var/log/nginx/error.log;
+pid /run/nginx.pid;
+
+include /usr/share/nginx/modules/*.conf;
+
+events {
+    worker_connections 1024;
+}
+
+http {
+    log_format  main  '$remote_addr - $remote_user [$time_local] "$request" '
+                      '$status $body_bytes_sent "$http_referer" '
+                      '"$http_user_agent" "$http_x_forwarded_for"';
+
+    access_log  /var/log/nginx/access.log  main;
+
+    sendfile            on;
+    tcp_nopush          on;
+    tcp_nodelay         on;
+    keepalive_timeout   65;
+    types_hash_max_size 4096;
+
+    include             /etc/nginx/mime.types;
+    default_type        application/octet-stream;
+
+    # Load configurations
+    include /etc/nginx/conf.d/*.conf;
+}
+EOF
 
 # Create directory for application
 echo "Creating application directory"
 mkdir -p /opt/workbook_importer
 
-# Create a simple health check page for Nginx
+# Create webroot directory for Nginx
 mkdir -p /usr/share/nginx/html
+
+# Create a simple health check page for Nginx
 cat > /usr/share/nginx/html/index.html <<'EOF'
 <!DOCTYPE html>
 <html>
@@ -58,23 +104,30 @@ app = Flask(__name__)
 def hello():
     return '<h1>Flask Test App is Working!</h1><p>This confirms the server can run Flask applications.</p>'
 
+@app.route('/health')
+def health():
+    return 'OK', 200
+
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5001)
 EOF
 
-# Configure Nginx as a reverse proxy
+# Configure Nginx as a reverse proxy with a clean configuration
 cat > /etc/nginx/conf.d/flask_app.conf <<'EOF'
 server {
-    listen 80;
-    server_name _;
+    listen 80 default_server;
+    server_name localhost;
 
     access_log /var/log/nginx/flask_access.log;
     error_log /var/log/nginx/flask_error.log;
 
+    # Root directory for static files
+    root /usr/share/nginx/html;
+
     # For health checks and static content
     location = / {
-        root /usr/share/nginx/html;
         index index.html;
+        try_files $uri /index.html;
     }
 
     # Forward requests to the Flask application with /app prefix
@@ -94,15 +147,24 @@ server {
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
     }
+
+    # Health check endpoint for load balancer
+    location = /health {
+        proxy_pass http://127.0.0.1:5001/health;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+    }
 }
 EOF
 
-# Remove default configuration if it exists
-rm -f /etc/nginx/conf.d/default.conf
+# Verify Nginx configuration
+echo "Verifying Nginx configuration"
+nginx -t
 
 # Apply Nginx settings
-echo "Restarting Nginx"
-systemctl restart nginx
+echo "Starting Nginx"
+systemctl start nginx
+systemctl enable nginx
 
 # Create a systemd service for the test Flask app
 cat > /etc/systemd/system/flask_app.service <<'EOF'
@@ -133,8 +195,12 @@ systemctl daemon-reload
 systemctl enable flask_app.service
 systemctl start flask_app.service
 
+# Wait for services to fully start
+sleep 5
+
 # Check service status and log it
-systemctl status flask_app.service > /opt/workbook_importer/service_status.log
+systemctl status nginx > /opt/workbook_importer/nginx_status.log
+systemctl status flask_app.service > /opt/workbook_importer/flask_status.log
 
 # Create a script to check service status
 cat > /opt/check_services.sh <<'EOF'
@@ -159,6 +225,9 @@ curl -v http://localhost:5001/
 echo
 echo "=== Routing test ===" 
 curl -v http://localhost/app
+echo
+echo "=== Health check test ==="
+curl -v http://localhost/health
 EOF
 
 # Make the script executable
@@ -180,6 +249,15 @@ echo "Region: $REGION" >> /usr/share/nginx/html/info.html
 echo "Private IP: $PRIVATE_IP" >> /usr/share/nginx/html/info.html
 echo "Public IP: $PUBLIC_IP" >> /usr/share/nginx/html/info.html
 echo "</pre>" >> /usr/share/nginx/html/info.html
+
+# Test connectivity from within the instance and log results
+echo "Testing instance connectivity:" > /usr/share/nginx/html/connectivity.html
+echo "<pre>" >> /usr/share/nginx/html/connectivity.html
+echo "Local Nginx: $(curl -s -o /dev/null -w "%{http_code}" http://localhost/)" >> /usr/share/nginx/html/connectivity.html
+echo "Local Flask: $(curl -s -o /dev/null -w "%{http_code}" http://localhost:5001/)" >> /usr/share/nginx/html/connectivity.html
+echo "Local Flask via Nginx: $(curl -s -o /dev/null -w "%{http_code}" http://localhost/app)" >> /usr/share/nginx/html/connectivity.html
+echo "Health check: $(curl -s -o /dev/null -w "%{http_code}" http://localhost/health)" >> /usr/share/nginx/html/connectivity.html
+echo "</pre>" >> /usr/share/nginx/html/connectivity.html
 
 # Log completion of user data script
 echo "User data script completed at $(date)"

@@ -12,12 +12,12 @@ resource "aws_elb" "web" {
     lb_protocol       = "http"
   }
 
-  # Health check configuration - use root path for basic health check first
+  # Health check configuration - initially use a static page for health checks
   health_check {
     healthy_threshold   = 2
     unhealthy_threshold = 3
     timeout             = 10
-    target              = "HTTP:80/"  # Checking Nginx's root path which serves a static file
+    target              = "HTTP:80/"  # Root path static HTML file
     interval            = 30
   }
   
@@ -30,5 +30,10 @@ resource "aws_elb" "web" {
   
   tags = {
     Name = "${var.app_name}-elb"
+  }
+  
+  # Give time for instances to initialize before adding them to the load balancer
+  provisioner "local-exec" {
+    command = "sleep 60"  # Wait for 60 seconds
   }
 }
