@@ -18,7 +18,7 @@ grep -A 10 "server {" /etc/nginx/nginx.conf
 echo ""
 
 echo "===== ACTIVE LISTENERS ====="
-netstat -tulpn | grep -E ':(80|5001)'
+netstat -tulpn | grep -E ':(80|443|5001|5002|5003)'
 echo ""
 
 echo "===== FIREWALL STATUS ====="
@@ -32,11 +32,17 @@ fi
 echo ""
 
 echo "===== TESTING LOCAL ACCESS ====="
+echo "Main landing page:"
 curl -v http://localhost/
 echo ""
-curl -v http://localhost/app
+echo "Workbook Importer:"
+curl -v http://localhost/importer
 echo ""
-curl -v http://localhost:5001/
+echo "Workbook Exporter:"
+curl -v http://localhost/exporter
+echo ""
+echo "Firewall Request Generator:"
+curl -v http://localhost/firewall
 echo ""
 
 echo "===== TESTING HEALTH CHECK ====="
@@ -67,7 +73,14 @@ echo "===== CHECKING LOAD BALANCER CONNECTIVITY ====="
 ELB_DNS=$(grep load_balancer_dns /opt/workbook_importer/instance_info.txt | cut -d' ' -f2)
 if [ -n "$ELB_DNS" ]; then
     echo "Testing connectivity to ELB: $ELB_DNS"
+    echo "Main landing page:"
     curl -v $ELB_DNS
+    echo "Workbook Importer:"
+    curl -v $ELB_DNS/importer
+    echo "Workbook Exporter:"
+    curl -v $ELB_DNS/exporter
+    echo "Firewall Request Generator:"
+    curl -v $ELB_DNS/firewall
 else
     echo "ELB DNS not found"
 fi

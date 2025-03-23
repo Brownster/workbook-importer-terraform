@@ -74,10 +74,12 @@ terraform apply
 
 ## Accessing via HTTPS
 
-After successful deployment, you can access your application via HTTPS:
+After successful deployment, you can access all applications via HTTPS:
 
-- Main URL: `https://your-domain.com/`
-- Application: `https://your-domain.com/app`
+- Main landing page: `https://your-domain.com/`
+- Workbook Importer: `https://your-domain.com/importer`
+- Workbook Exporter: `https://your-domain.com/exporter`
+- Firewall Request Generator: `https://your-domain.com/firewall`
 
 ## Troubleshooting
 

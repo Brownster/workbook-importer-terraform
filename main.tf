@@ -1,5 +1,6 @@
 provider "aws" {
-  region = "eu-west-2" # London
+  region  = "eu-west-2" # London
+  version = "~> 3.0"
 }
 
 resource "aws_vpc" "web_vpc" {
@@ -54,9 +55,17 @@ resource "aws_instance" "web" {
     Name = "${var.app_name}-server-${count.index + 1}" 
   }
   
+  # Enforce IMDSv2 to prevent SSRF attacks
+  metadata_options {
+    http_endpoint               = "enabled"
+    http_tokens                 = "required"
+    http_put_response_hop_limit = 1
+  }
+
   root_block_device {
     volume_size = 20
     volume_type = "gp2"
+    encrypted   = true
     delete_on_termination = true
     
     tags = {

@@ -17,16 +17,25 @@ If you cannot access the application via the load balancer or instance directly:
 
 ### Verify Services Running
 
-Check if both Nginx and Flask services are running:
+Check if Nginx and all application services are running:
 ```bash
 sudo systemctl status nginx
-sudo systemctl status flask_app.service
+sudo systemctl status workbook_importer.service
+sudo systemctl status workbook_exporter.service
+sudo systemctl status firewall_generator.service
 ```
 
-If either service is not running, try restarting it:
+If any service is not running, try restarting it:
 ```bash
 sudo systemctl restart nginx
-sudo systemctl restart flask_app.service
+sudo systemctl restart workbook_importer.service
+sudo systemctl restart workbook_exporter.service
+sudo systemctl restart firewall_generator.service
+```
+
+You can also check all services at once using the provided script:
+```bash
+sudo /opt/check_services.sh
 ```
 
 ### Check Logs for Errors
@@ -36,9 +45,16 @@ View Nginx error logs:
 sudo cat /var/log/nginx/flask_error.log
 ```
 
-View Flask application logs:
+View application logs:
 ```bash
-sudo journalctl -u flask_app.service
+# Workbook Importer logs
+sudo journalctl -u workbook_importer.service
+
+# Workbook Exporter logs
+sudo journalctl -u workbook_exporter.service
+
+# Firewall Request Generator logs
+sudo journalctl -u firewall_generator.service
 ```
 
 Check user data script execution logs:
@@ -50,20 +66,23 @@ sudo cat /var/log/user-data.log
 
 Test network connectivity on the instance:
 ```bash
-# Check listening ports
-sudo netstat -tulpn | grep -E ':(80|5001)'
+# Check listening ports for all applications
+sudo netstat -tulpn | grep -E ':(80|5001|5002|5003)'
 
 # Test local access
-curl http://localhost/
-curl http://localhost:5001/
+curl http://localhost/                 # Main landing page
+curl http://localhost/importer         # Workbook Importer
+curl http://localhost/exporter         # Workbook Exporter
+curl http://localhost/firewall         # Firewall Request Generator
+curl http://localhost/health           # Health check endpoint
 ```
 
 ### Check Security Groups
 
 Verify security group rules allow:
 - Port 80 inbound from anywhere (for HTTP)
-- Port 5001 inbound if accessing Flask directly
-- Port 22 inbound for SSH access
+- Port 443 inbound if HTTPS is enabled
+- Port 22 inbound from your management IP only (for SSH access)
 
 ## Load Balancer Issues
 

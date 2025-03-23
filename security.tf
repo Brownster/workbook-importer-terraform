@@ -24,13 +24,14 @@ resource "aws_security_group" "elb_sg" {
     }
   }
   
-  # Allow all outbound traffic to the VPC CIDR range
+  # Restrict outbound traffic to only what's needed
+  # HTTP to instances (for health checks and forwarding requests)
   egress {
-    from_port   = 0
-    to_port     = 0
-    protocol    = "-1"
+    from_port   = 80
+    to_port     = 80
+    protocol    = "tcp"
     cidr_blocks = [var.network_cidr]
-    description = "Allow all outbound traffic to the VPC"
+    description = "Allow HTTP traffic to web instances"
   }
   
   tags = {
@@ -106,7 +107,7 @@ resource "aws_security_group" "web_sg" {
   }
 }
 
-# Add ELB ingress rules separately to avoid circular dependencies
+# Add HTTP ingress rule for web servers from the load balancer
 resource "aws_security_group_rule" "web_http_from_elb" {
   security_group_id        = aws_security_group.web_sg.id
   type                     = "ingress"
@@ -117,12 +118,5 @@ resource "aws_security_group_rule" "web_http_from_elb" {
   description              = "Allow HTTP traffic from the load balancer"
 }
 
-resource "aws_security_group_rule" "web_flask_from_elb" {
-  security_group_id        = aws_security_group.web_sg.id
-  type                     = "ingress"
-  from_port                = 5001
-  to_port                  = 5001
-  protocol                 = "tcp"
-  source_security_group_id = aws_security_group.elb_sg.id
-  description              = "Allow Flask app traffic (port 5001) from the load balancer"
-}
+# Flask is only accessed internally by Nginx, no need to open it to the ELB
+# Port 5001 is only used internally on each instance

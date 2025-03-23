@@ -1,6 +1,10 @@
-# Workbook Importer AWS Terraform Infrastructure
+# Network Tools Suite AWS Terraform Infrastructure
 
-This repository contains Terraform configuration to deploy the [Workbook Importer](https://github.com/Brownster/workbook_importer) Flask application on AWS EC2 instances behind a load balancer in the London (eu-west-2) region.
+This repository contains Terraform configuration to deploy a suite of network management tools on AWS EC2 instances behind a load balancer in the London (eu-west-2) region. The suite includes:
+
+1. [Workbook Importer](https://github.com/Brownster/workbook_importer) - Import and process network workbooks
+2. [Workbook Exporter](https://github.com/Brownster/workbook_exporter) - Export network configurations to standardized workbooks
+3. [Firewall Request Generator](https://github.com/Brownster/portmapper) - Generate properly formatted firewall change requests
 
 ## Architecture
 
@@ -20,10 +24,15 @@ This repository contains Terraform configuration to deploy the [Workbook Importe
 Upon deployment, the infrastructure automatically:
 1. Provisions networking components (VPC, subnets, routing)
 2. Creates EC2 instances with Amazon Linux 2
-3. Installs and configures Nginx, Python, and dependencies
-4. Clones the Workbook Importer repository
-5. Configures the Flask application as a systemd service
-6. Sets up load balancing with health checks
+3. Installs and configures Nginx, Python, wkhtmltopdf, and dependencies
+4. Clones all application repositories:
+   - Workbook Importer
+   - Workbook Exporter
+   - Firewall Request Generator
+5. Configures each application as a systemd service
+6. Sets up a central landing page with links to all applications
+7. Configures Nginx as a reverse proxy to route traffic to each application
+8. Sets up load balancing with health checks
 
 ## Requirements
 
@@ -66,13 +75,16 @@ Upon deployment, the infrastructure automatically:
    - `load_balancer_dns`: DNS name of the load balancer
    - `public_ips`: Public IP addresses of the EC2 instances
 
-## Accessing the Application
+## Accessing the Applications
 
-You can access the application through the load balancer:
+You can access all applications through the load balancer:
 
 - **Main landing page**: http://[load_balancer_dns]/
-- **Workbook Importer App**: http://[load_balancer_dns]/app
+- **Workbook Importer**: http://[load_balancer_dns]/importer
+- **Workbook Exporter**: http://[load_balancer_dns]/exporter
+- **Firewall Request Generator**: http://[load_balancer_dns]/firewall
 - **Health check endpoint**: http://[load_balancer_dns]/health
+- **Server information**: http://[load_balancer_dns]/info.html
 
 If you need to access the instance directly (restricted to your management IP):
 
@@ -140,15 +152,19 @@ listener {
 
 ## Security Considerations
 
-- **SSH Access**: SSH access is limited to your management IP address. Set your IP in the `management_ip` variable before deploying.
+- **SSH Access**: SSH access is strictly limited to your management IP address. You MUST set your IP in the `management_ip` variable before deploying.
 - **Restricted Traffic**: Only necessary outbound traffic is allowed:
   - HTTPS to GitHub repositories
   - HTTP/HTTPS for package repositories
   - DNS and NTP for essential services
 - **Internal Flask Application**: The Flask app is only accessible through the load balancer, not directly
-- **HTTPS**: For production, enable HTTPS using AWS Certificate Manager
-- **Instance Profile**: Consider using IAM roles instead of hardcoded credentials
-- **Network Segmentation**: Further isolate components using network ACLs
+- **HTTPS**: For production, enable HTTPS using AWS Certificate Manager (see docs/https_instructions.md)
+- **Enhanced EC2 Security**:
+  - IMDSv2 required to prevent SSRF attacks
+  - EBS volumes encrypted at rest
+  - Restricted network access
+- **Load Balancer Security**: ELB's outbound traffic is restricted to only necessary connections
+- **Future Improvements**: See docs/improvement_plan.md for planned security enhancements
 
 ## Maintenance
 

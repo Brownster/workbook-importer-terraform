@@ -43,6 +43,11 @@ variable "app_name" {
 variable "management_ip" {
   description = "IP address allowed to SSH to instances (use your own IP)"
   default     = "0.0.0.0"  # Change this to your IP address before deploying
+  
+  validation {
+    condition     = var.management_ip != "0.0.0.0"
+    error_message = "Management IP must be set to your specific IP address, not 0.0.0.0."
+  }
 }
 
 # Domain name for HTTPS setup
