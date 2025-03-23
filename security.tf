@@ -24,13 +24,13 @@ resource "aws_security_group" "elb_sg" {
     }
   }
   
-  # Only allow outbound traffic to the web instances on port 80
+  # Allow all outbound traffic to the VPC CIDR range
   egress {
-    from_port       = 80
-    to_port         = 80
-    protocol        = "tcp"
-    security_groups = [aws_security_group.web_sg.id]
-    description     = "Allow HTTP traffic to web instances"
+    from_port   = 0
+    to_port     = 0
+    protocol    = "-1"
+    cidr_blocks = [var.network_cidr]
+    description = "Allow all outbound traffic to the VPC"
   }
   
   tags = {
@@ -38,28 +38,11 @@ resource "aws_security_group" "elb_sg" {
   }
 }
 
+# Create the web security group first without the ELB references
 resource "aws_security_group" "web_sg" {
   name        = "${var.app_name}-web-sg"
   description = "Restricted access security group for web servers"
   vpc_id      = aws_vpc.web_vpc.id
-  
-  # HTTP access from load balancer only
-  ingress {
-    from_port       = 80
-    to_port         = 80
-    protocol        = "tcp"
-    security_groups = [aws_security_group.elb_sg.id]
-    description     = "Allow HTTP traffic from the load balancer only"
-  }
-  
-  # HTTP access for Flask from ELB
-  ingress {
-    from_port       = 5001
-    to_port         = 5001
-    protocol        = "tcp"
-    security_groups = [aws_security_group.elb_sg.id]
-    description     = "Allow Flask app traffic (port 5001) from the load balancer"
-  }
   
   # SSH access only from your management IP
   ingress {
@@ -121,4 +104,25 @@ resource "aws_security_group" "web_sg" {
   tags = {
     Name = "${var.app_name}-web-sg"
   }
+}
+
+# Add ELB ingress rules separately to avoid circular dependencies
+resource "aws_security_group_rule" "web_http_from_elb" {
+  security_group_id        = aws_security_group.web_sg.id
+  type                     = "ingress"
+  from_port                = 80
+  to_port                  = 80
+  protocol                 = "tcp"
+  source_security_group_id = aws_security_group.elb_sg.id
+  description              = "Allow HTTP traffic from the load balancer"
+}
+
+resource "aws_security_group_rule" "web_flask_from_elb" {
+  security_group_id        = aws_security_group.web_sg.id
+  type                     = "ingress"
+  from_port                = 5001
+  to_port                  = 5001
+  protocol                 = "tcp"
+  source_security_group_id = aws_security_group.elb_sg.id
+  description              = "Allow Flask app traffic (port 5001) from the load balancer"
 }
