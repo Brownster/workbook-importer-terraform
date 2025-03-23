@@ -40,7 +40,16 @@ resource "aws_security_group" "web_sg" {
     description     = "Allow HTTP traffic from the load balancer only"
   }
   
-  # SSH access only from your management IP (change this to your IP)
+  # HTTP access for Flask from ELB
+  ingress {
+    from_port       = 5001
+    to_port         = 5001
+    protocol        = "tcp"
+    security_groups = [aws_security_group.elb_sg.id]
+    description     = "Allow Flask app traffic (port 5001) from the load balancer"
+  }
+  
+  # SSH access only from your management IP
   ingress {
     from_port   = 22
     to_port     = 22
