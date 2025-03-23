@@ -35,9 +35,16 @@ log_command "yum install -y wkhtmltopdf telnet nc wget"
 log_message "Creating directory structure"
 log_command "mkdir -p /usr/share/nginx/html /opt/workbook_importer /opt/workbook_exporter /opt/firewall_generator /opt/logs"
 
+# Gather instance metadata
+log_message "Gathering instance metadata"
+INSTANCE_ID=$(curl -s http://169.254.169.254/latest/meta-data/instance-id || echo "Unknown")
+REGION=$(curl -s http://169.254.169.254/latest/meta-data/placement/region || echo "Unknown")
+PRIVATE_IP=$(curl -s http://169.254.169.254/latest/meta-data/local-ipv4 || echo "Unknown")
+PUBLIC_IP=$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4 || echo "Unknown")
+
 # Create a simple health check page immediately
 log_message "Creating health check page"
-echo "<html><body><h1>Server is up</h1><p>Instance ID: $(curl -s http://169.254.169.254/latest/meta-data/instance-id)</p></body></html>" > /usr/share/nginx/html/index.html
+echo "<html><body><h1>Server is up</h1><p>Instance ID: $INSTANCE_ID</p></body></html>" > /usr/share/nginx/html/index.html
 
 # Configure and start Nginx immediately for health checks
 log_message "Configuring basic Nginx"
@@ -94,10 +101,6 @@ EOF
 
 # Create info.html page
 log_message "Creating info.html page"
-INSTANCE_ID=$(curl -s http://169.254.169.254/latest/meta-data/instance-id)
-PRIVATE_IP=$(curl -s http://169.254.169.254/latest/meta-data/local-ipv4)
-PUBLIC_IP=$(curl -s http://169.254.169.254/latest/meta-data/public-ipv4)
-
 cat > /usr/share/nginx/html/info.html <<EOF
 <html>
 <head><title>Instance Info</title></head>
@@ -105,6 +108,7 @@ cat > /usr/share/nginx/html/info.html <<EOF
 <h1>Instance Information</h1>
 <pre>
 Instance ID: ${INSTANCE_ID}
+Region: ${REGION}
 Private IP: ${PRIVATE_IP}
 Public IP: ${PUBLIC_IP}
 </pre>
@@ -195,8 +199,50 @@ done
 if [ $attempts -eq 3 ]; then
   log_message "Failed to download script after 3 attempts. Using basic configuration."
   
-  # Create a simple flask app configuration
-  log_message "Setting up basic flask app configuration"
+  # Create basic pages for each app
+  log_message "Creating basic app pages"
+  mkdir -p /usr/share/nginx/html/importer
+  mkdir -p /usr/share/nginx/html/exporter
+  mkdir -p /usr/share/nginx/html/firewall
+  
+  # Create basic app pages
+  for app in "importer" "exporter" "firewall"; do
+    title=""
+    case "$app" in
+      "importer") title="Workbook Importer" ;;
+      "exporter") title="Workbook Exporter" ;;
+      "firewall") title="Firewall Request Generator" ;;
+    esac
+    
+    cat > "/usr/share/nginx/html/$app/index.html" <<EOF
+<html>
+<head><title>$title</title></head>
+<body>
+<h1>$title</h1>
+<p>This is a basic version of the $title application.</p>
+<p>The full application is still being configured.</p>
+<p><a href="/">Return to Home</a></p>
+</body>
+</html>
+EOF
+  done
+  
+  # Create health status page
+  cat > /usr/share/nginx/html/health.html <<EOF
+<html>
+<head><title>Health Status</title></head>
+<body>
+<h1>Health Status</h1>
+<p>Server: <span style="color:green">✓ Online</span></p>
+<p>Instance ID: ${INSTANCE_ID}</p>
+<p>Services being configured. Full health status will be available soon.</p>
+<p><a href="/">Return to Home</a></p>
+</body>
+</html>
+EOF
+
+  # Create a proper flask app configuration that proxies to the correct ports
+  log_message "Setting up proper app proxying configuration"
   cat > /etc/nginx/conf.d/apps.conf <<'EOF'
 server {
     listen 80 default_server;
@@ -205,23 +251,91 @@ server {
     root /usr/share/nginx/html;
     index index.html;
 
+    access_log /var/log/nginx/apps_access.log;
+    error_log /var/log/nginx/apps_error.log;
+
     # Main landing page
-    location / {
-        try_files $uri $uri/ =404;
+    location = / {
+        index index.html;
+    }
+
+    # Health check endpoint for load balancer
+    location = /health {
+        proxy_pass http://127.0.0.1:5001/health;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        # Fallback if application not yet running
+        error_page 502 504 = @health_static;
     }
     
-    # Health check endpoint
-    location = /health {
+    location @health_static {
         return 200 'OK';
         add_header Content-Type text/plain;
     }
+
+    # Workbook Importer - normally on port 5001
+    location /importer {
+        proxy_pass http://127.0.0.1:5001/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        # Fallback if application not yet running
+        error_page 502 504 = @importer_static;
+    }
     
-    # Add info.html endpoint
+    location @importer_static {
+        alias /usr/share/nginx/html/importer;
+        try_files $uri $uri/ /importer/index.html;
+    }
+
+    # Workbook Exporter - on port 5002 with gunicorn
+    location /exporter {
+        proxy_pass http://127.0.0.1:5002/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        # Fallback if application not yet running
+        error_page 502 504 = @exporter_static;
+    }
+    
+    location @exporter_static {
+        alias /usr/share/nginx/html/exporter;
+        try_files $uri $uri/ /exporter/index.html;
+    }
+
+    # Firewall Request Generator - on port 5003
+    location /firewall {
+        proxy_pass http://127.0.0.1:5003/;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        # Fallback if application not yet running
+        error_page 502 504 = @firewall_static;
+    }
+    
+    location @firewall_static {
+        alias /usr/share/nginx/html/firewall;
+        try_files $uri $uri/ /firewall/index.html;
+    }
+    
+    # Static files for all applications
+    location /static/ {
+        # Try each application's static folder
+        try_files $uri @importer_static @exporter_static @firewall_static;
+    }
+
+    # Information pages
+    location = /health.html {
+        default_type text/html;
+    }
+    
     location = /info.html {
         default_type text/html;
     }
     
-    # Add setup-complete.html endpoint
     location = /setup-complete.html {
         default_type text/html;
     }
@@ -231,6 +345,80 @@ EOF
   # Reload Nginx to apply the new configuration
   log_command "nginx -t"
   log_command "systemctl reload nginx"
+  
+  # Set up systemd services for each application
+  log_message "Setting up systemd services for applications"
+  
+  # Systemd service for Workbook Importer
+  cat > /etc/systemd/system/workbook_importer.service <<'EOF'
+[Unit]
+Description=Workbook Importer Flask App
+After=network.target
+
+[Service]
+User=ec2-user
+WorkingDirectory=/opt/workbook_importer
+ExecStart=/usr/bin/python3 -m flask run --host=127.0.0.1 --port=5001
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+Environment=FLASK_APP=app.py
+Environment=FLASK_ENV=production
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+  # Systemd service for Workbook Exporter
+  cat > /etc/systemd/system/workbook_exporter.service <<'EOF'
+[Unit]
+Description=Workbook Exporter Flask App
+After=network.target
+
+[Service]
+User=ec2-user
+WorkingDirectory=/opt/workbook_exporter
+ExecStart=/usr/bin/python3 -m flask run --host=127.0.0.1 --port=5002
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+Environment=FLASK_APP=workbook_exporter-fe5.py
+Environment=FLASK_ENV=production
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+  # Systemd service for Firewall Request Generator
+  cat > /etc/systemd/system/firewall_generator.service <<'EOF'
+[Unit]
+Description=Firewall Request Generator Flask App
+After=network.target
+
+[Service]
+User=ec2-user
+WorkingDirectory=/opt/firewall_generator
+ExecStart=/usr/bin/python3 -m flask run --host=127.0.0.1 --port=5003
+Restart=always
+RestartSec=5
+StandardOutput=journal
+StandardError=journal
+Environment=FLASK_APP=app.py
+Environment=FLASK_ENV=production
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+  # Install Flask for the flask run command
+  log_command "pip3 install flask gunicorn"
+  
+  # Start and enable services
+  log_command "systemctl daemon-reload"
+  log_command "systemctl enable workbook_importer.service workbook_exporter.service firewall_generator.service"
+  log_command "systemctl start workbook_importer.service workbook_exporter.service firewall_generator.service"
   
   create_completion_marker
 fi
