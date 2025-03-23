@@ -1,6 +1,14 @@
+terraform {
+  required_providers {
+    aws = {
+      source  = "hashicorp/aws"
+      version = "~> 5.0"
+    }
+  }
+}
+
 provider "aws" {
-  region  = "eu-west-2" # London
-  version = "~> 3.0"
+  region = "eu-west-2" # London
 }
 
 resource "aws_vpc" "web_vpc" {
@@ -34,8 +42,8 @@ resource "aws_instance" "web" {
   # Use the public subnet ids for instances to ensure they get public IPs
   subnet_id              = element(aws_subnet.public_subnet.*.id, count.index % length(aws_subnet.public_subnet.*.id))
   
-  # Use instance user_data to install and configure the Flask app
-  user_data              = file("user_data.sh")
+  # Use instance user_data to install and configure the applications
+  user_data              = file("user_data_compact.sh")
   
   # Attach the web server security group
   vpc_security_group_ids = [aws_security_group.web_sg.id]
