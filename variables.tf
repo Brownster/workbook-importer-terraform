@@ -42,7 +42,7 @@ variable "app_name" {
 # Management IP address for SSH access
 variable "management_ip" {
   description = "IP address allowed to SSH to instances (use your own IP)"
-  default     = "0.0.0.0"  # Change this to your IP address before deploying
+  default     = "92.232.199.25"  # Management IP address
   
   validation {
     condition     = var.management_ip != "0.0.0.0"
