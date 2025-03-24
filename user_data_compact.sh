@@ -202,9 +202,7 @@ if [ $attempts -eq 3 ]; then
   
   # Create basic pages for each app
   log_message "Creating basic app pages"
-  mkdir -p /usr/share/nginx/html/importer
-  mkdir -p /usr/share/nginx/html/exporter
-  mkdir -p /usr/share/nginx/html/firewall
+  # Directories already created earlier, no need to recreate
   
   # Create basic app pages
   for app in "importer" "exporter" "firewall"; do
@@ -242,8 +240,43 @@ EOF
 </html>
 EOF
 
-  # Create a proper flask app configuration that proxies to the correct ports
-  log_message "Setting up proper app proxying configuration"
+  # Create an extremely simple Nginx config first - guaranteed to work
+  log_message "Setting up simple guaranteed-working Nginx configuration"
+  cat > /etc/nginx/conf.d/simple.conf <<'EOF'
+server {
+    listen 80 default_server;
+    server_name localhost;
+
+    root /usr/share/nginx/html;
+    index index.html;
+
+    # Main landing page
+    location / {
+        try_files $uri $uri/ =404;
+    }
+
+    # Simple health check endpoint for load balancer
+    location = /health {
+        return 200 'OK';
+        add_header Content-Type text/plain;
+    }
+}
+EOF
+
+  # Ensure log directory exists and has correct permissions
+  log_message "Setting up log directory permissions"
+  log_command "mkdir -p /var/log/nginx"
+  log_command "chmod 755 /var/log/nginx"
+  log_command "chown nginx:nginx /var/log/nginx"
+
+  # Check the Nginx configuration and start Nginx
+  log_message "Testing and starting Nginx with basic configuration"
+  log_command "nginx -t"
+  log_command "systemctl start nginx"
+  log_command "systemctl status nginx"
+  
+  # Now create a better configuration for the applications
+  log_message "Creating more comprehensive Nginx config"
   cat > /etc/nginx/conf.d/apps.conf <<'EOF'
 server {
     listen 80 default_server;
@@ -260,10 +293,8 @@ server {
         index index.html;
     }
 
-    # Health check endpoint for load balancer
+    # Simple health check endpoint for load balancer
     location = /health {
-        # Simple static health check that always returns OK
-        # This is more reliable than depending on the application
         return 200 'OK';
         add_header Content-Type text/plain;
     }
@@ -275,41 +306,27 @@ server {
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
-        # Fallback if application not yet running
-        error_page 502 504 = /importer/index.html;
     }
     
-    # Static files for importer
-    location /importer/ {
-        try_files $uri $uri/ @proxy_importer;
-    }
-    
-    location @proxy_importer {
-        proxy_pass http://127.0.0.1:5001/;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
+    # Static fallback for importer
+    location /importer/index.html {
+        root /usr/share/nginx/html;
+        index index.html;
     }
 
-    # Workbook Exporter - on port 5002 with gunicorn
+    # Workbook Exporter - on port 5002
     location /exporter {
         proxy_pass http://127.0.0.1:5002/;
         proxy_set_header Host $host;
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
-        # Fallback if application not yet running
-        error_page 502 504 = /exporter/index.html;
     }
     
-    # Static files for exporter
-    location /exporter/ {
-        try_files $uri $uri/ @proxy_exporter;
-    }
-    
-    location @proxy_exporter {
-        proxy_pass http://127.0.0.1:5002/;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
+    # Static fallback for exporter
+    location /exporter/index.html {
+        root /usr/share/nginx/html;
+        index index.html;
     }
 
     # Firewall Request Generator - on port 5003
@@ -319,40 +336,93 @@ server {
         proxy_set_header X-Real-IP $remote_addr;
         proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
         proxy_set_header X-Forwarded-Proto $scheme;
-        # Fallback if application not yet running
-        error_page 502 504 = /firewall/index.html;
     }
     
-    # Static files for firewall
-    location /firewall/ {
-        try_files $uri $uri/ @proxy_firewall;
+    # Static fallback for firewall
+    location /firewall/index.html {
+        root /usr/share/nginx/html;
+        index index.html;
     }
     
-    location @proxy_firewall {
-        proxy_pass http://127.0.0.1:5003/;
-        proxy_set_header Host $host;
-        proxy_set_header X-Real-IP $remote_addr;
-    }
-    
-    # Static files for all applications
+    # Static files
     location /static/ {
-        # Try the static directories
-        try_files $uri /usr/share/nginx/html/static/$uri =404;
+        root /usr/share/nginx/html;
     }
 
     # Information pages
     location = /health.html {
-        default_type text/html;
+        root /usr/share/nginx/html;
     }
     
     location = /info.html {
-        default_type text/html;
+        root /usr/share/nginx/html;
     }
     
     location = /setup-complete.html {
-        default_type text/html;
+        root /usr/share/nginx/html;
     }
 }
+EOF
+
+  # Create a self-repair script for Nginx
+  log_message "Creating Nginx repair script"
+  cat > /opt/repair_nginx.sh <<'EOF'
+#!/bin/bash
+
+# Check if Nginx is running
+if ! systemctl is-active --quiet nginx; then
+  echo "Nginx is not running. Attempting repair..."
+  
+  # Remove the current config files
+  rm -f /etc/nginx/conf.d/apps.conf
+  
+  # Create extremely simple config
+  cat > /etc/nginx/conf.d/simple.conf <<'CONFIG'
+server {
+    listen 80 default_server;
+    server_name localhost;
+
+    root /usr/share/nginx/html;
+    index index.html;
+
+    location / {
+        try_files $uri $uri/ =404;
+    }
+
+    location = /health {
+        return 200 'OK';
+        add_header Content-Type text/plain;
+    }
+}
+CONFIG
+
+  # Test and restart
+  nginx -t && systemctl start nginx
+  
+  echo "Nginx repair attempt complete. Status:"
+  systemctl status nginx
+else
+  echo "Nginx is running normally."
+fi
+EOF
+  chmod +x /opt/repair_nginx.sh
+
+  # Add a cron job to check Nginx every minute
+  log_message "Adding cron job for Nginx self-repair"
+  echo "* * * * * /opt/repair_nginx.sh >/dev/null 2>&1" | crontab -
+
+  # Test the new configuration
+  log_message "Testing new Nginx configuration"
+  log_command "nginx -t"
+  
+  # If the test is successful, apply the new configuration
+  if [ $? -eq 0 ]; then
+    log_message "New configuration test successful, reloading Nginx"
+    log_command "systemctl reload nginx"
+  else
+    log_message "New configuration test failed, keeping simple configuration"
+    log_command "/opt/repair_nginx.sh"
+  fi
 EOF
 
   # Reload Nginx to apply the new configuration
@@ -371,7 +441,7 @@ After=network.target
 [Service]
 User=ec2-user
 WorkingDirectory=/opt/workbook_importer
-ExecStart=/usr/bin/python3 -m flask run --host=127.0.0.1 --port=5001
+ExecStart=/usr/bin/python3 app.py
 Restart=always
 RestartSec=5
 StandardOutput=journal
@@ -392,12 +462,13 @@ After=network.target
 [Service]
 User=ec2-user
 WorkingDirectory=/opt/workbook_exporter
-ExecStart=/usr/bin/python3 -m flask run --host=127.0.0.1 --port=5002
+ExecStart=/usr/bin/python3 app.py
 Restart=always
 RestartSec=5
 StandardOutput=journal
 StandardError=journal
 Environment=FLASK_APP=app.py
+Environment=PORT=5002
 Environment=FLASK_ENV=production
 
 [Install]
@@ -413,12 +484,13 @@ After=network.target
 [Service]
 User=ec2-user
 WorkingDirectory=/opt/firewall_generator
-ExecStart=/usr/bin/python3 -m flask run --host=127.0.0.1 --port=5003
+ExecStart=/usr/bin/python3 app.py
 Restart=always
 RestartSec=5
 StandardOutput=journal
 StandardError=journal
 Environment=FLASK_APP=app.py
+Environment=PORT=5003
 Environment=FLASK_ENV=production
 
 [Install]
